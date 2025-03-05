@@ -3,9 +3,9 @@ const path = require('path');
 const connectDB = require('./db'); // Import database connection
 const Task = require('./task'); // Import the Task model
 const cors = require('cors');
-app.use(cors()); // Enable CORS for all routes
 
 const app = express();
+app.use(cors()); // Enable CORS for all routes
 
 console.log(connectDB);
 connectDB(); 
