@@ -29,6 +29,18 @@ app.get('/tasks', async (req, res) => {
       res.status(500).json({ error: 'Server error', message: error.message }); // Send error message in the response
     }
   });
+
+  app.post('/tasks', async (req, res) => {
+    try {
+      const { name, comment } = req.body;
+      const newTask = new Task({ name, comment, finished: false });
+      await newTask.save();
+      res.json(newTask);
+    } catch (error) {
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
+  
   
   if (process.env.NODE_ENV === 'production') {
     // Set static folder
