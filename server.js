@@ -51,6 +51,25 @@ app.get('/tasks', async (req, res) => {
       res.sendFile(path.resolve(__dirname, 'client', 'build', 'index.html'));
     });
   }
+
+
+  app.delete('/tasks/:taskId', async (req, res) => {
+    try {
+      const taskId = req.params.taskId;
+  
+      // Try to delete the task by _id
+      const result = await Task.deleteOne({ _id: taskId });
+  
+      if (result.deletedCount === 0) {
+        return res.status(404).json({ message: 'Task not found' });
+      }
+  
+      return res.status(200).json({ message: 'Task deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      return res.status(500).json({ message: 'Server error' });
+    }
+  });
   
   const PORT = process.env.PORT || 3000;
 

@@ -4,6 +4,8 @@ const taskSchema = new mongoose.Schema({
   name: String,
   comment: String,
   finished: Boolean,
+},{
+  timestamps: true,
 });
 
 // Define and export the Task model, make sure the third argument ('list') is correct
