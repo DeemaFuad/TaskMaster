@@ -70,6 +70,31 @@ app.get('/tasks', async (req, res) => {
       return res.status(500).json({ message: 'Server error' });
     }
   });
+
+  app.put('/tasks/:taskId', async (req, res) => {
+    const { taskId } = req.params;
+    const { finished } = req.body;
+  
+    if (typeof finished !== 'boolean') {
+      return res.status(400).send('Invalid task status');
+    }
+  
+    try {
+      const updatedTask = await Task.findByIdAndUpdate(
+        taskId,
+        { finished },
+        { new: true } // Returns the updated task
+      );
+  
+      if (!updatedTask) {
+        return res.status(404).send('Task not found');
+      }
+  
+      res.status(200).json(updatedTask);
+    } catch (error) {
+      res.status(500).send('Error updating task');
+    }
+  });
   
   const PORT = process.env.PORT || 3000;
 
