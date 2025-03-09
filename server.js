@@ -95,6 +95,29 @@ app.get('/tasks', async (req, res) => {
       res.status(500).send('Error updating task');
     }
   });
+// handle editing task
+app.put("/tasks/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, comment, finished } = req.body;
+
+  console.log('Updating task with ID:', id);
+  console.log('Request Body:', req.body);
+  try {
+    const updatedTask = await Task.findByIdAndUpdate(
+      id,
+      { name, comment, finished },  // Update name, comment, and finished
+      { new: true }  // Return the updated task
+    );
+
+    if (!updatedTask) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    res.json(updatedTask);  // Return updated task to frontend
+  } catch (error) {
+    res.status(500).json({ message: "Error updating task", error });
+  }
+});
   
   const PORT = process.env.PORT || 3000;
 
