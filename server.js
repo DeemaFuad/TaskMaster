@@ -6,6 +6,9 @@ const cors = require('cors');
 const User = require('./user');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { authenticateToken, isAdmin } = require('./authMiddleware');
+const JWT_SECRET = "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6A7B8C9D0E1F2G3H4I5J6K7L8M9N0O1P2";
+
 
 
 const app = express();
@@ -24,16 +27,14 @@ app.get('/admin',(req,res)=>{
     res.send("this is the admin page");
 })
 
-// Assuming you are using Express.js
-app.get('/tasks', async (req, res) => {
-  const userId = req.userId; // Assuming you have a way to get the userId (from a token or session)
-
-  if (!userId) {
+app.get('/tasks', authenticateToken, async (req, res) => {
+  if (!req.user || !req.user.userId) {
     return res.status(400).json({ message: 'User not authenticated' });
   }
 
   try {
-    const tasks = await Task.find({ userId: _id }); // Find tasks that match the logged-in user
+    // Filter tasks by the authenticated user's ID
+    const tasks = await Task.find({ userId: req.user.userId }).populate('userId');
     res.status(200).json(tasks);
   } catch (error) {
     console.error('Error fetching tasks:', error);
@@ -42,16 +43,23 @@ app.get('/tasks', async (req, res) => {
 });
 
 
-  app.post('/tasks', async (req, res) => {
-    try {
-      const { name, comment } = req.body;
-      const newTask = new Task({ name, comment, finished: false });
-      await newTask.save();
-      res.json(newTask);
-    } catch (error) {
-      res.status(500).json({ error: 'Server error' });
-    }
-  });
+app.post('/tasks', authenticateToken, async (req, res) => {
+  try {
+    const { name, comment } = req.body;
+    const newTask = new Task({ 
+      name, 
+      comment, 
+      finished: false, 
+      userId: req.user.userId  // Changed from req.user._id to req.user.userId
+    });
+    await newTask.save();
+    res.json(newTask);
+  } catch (error) {
+    console.error('Error creating task:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+// ... existing code ...
   
   
   if (process.env.NODE_ENV === 'production') {
@@ -144,13 +152,14 @@ app.post('/signup', async (req, res) => {
       }
 
       // Hash the password
-      const passwordHash = await bcrypt.hash(password, 10); // The number 10 is the salt rounds
+      const passwordHash = await bcrypt.hash(password, 10);
 
       // Create a new user with the hashed password
       const newUser = new User({
           username,
           email,
-          passwordHash,  // Store the hashed password
+          passwordHash,
+          role: 'user' // Set default role as 'user'
       });
 
       // Save the new user to the database
@@ -180,7 +189,14 @@ app.post('/login', async (req, res) => {
     }
 
     // Generate a JWT token if the credentials are correct
-    const token = jwt.sign({ userId: user._id }, "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6A7B8C9D0E1F2G3H4I5J6K7L8M9N0O1P2", { expiresIn: '1h' });
+    const token = jwt.sign(
+      { 
+        userId: user._id,
+        role: user.role 
+      }, 
+      JWT_SECRET, 
+      { expiresIn: '1h' }
+    );
 
     res.status(200).json({ token });
   } catch (error) {
@@ -189,7 +205,60 @@ app.post('/login', async (req, res) => {
   }
 });
 
+// Admin routes
+app.get('/admin/users', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const users = await User.find({}, '-passwordHash');
+    res.json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
-  const PORT = process.env.PORT || 3000;
+app.delete('/admin/users/:userId', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
+    // Prevent admin from deleting themselves
+    if (user._id.toString() === req.user.userId) {
+      return res.status(400).json({ message: 'Cannot delete your own admin account' });
+    }
+
+    await User.findByIdAndDelete(userId);
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get tasks for a specific user (admin only)
+app.get('/admin/users/:userId/tasks', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    console.log('Fetching tasks for user:', userId);
+    
+    // First check if user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      console.log('User not found:', userId);
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const tasks = await Task.find({ userId }).populate('userId');
+    console.log('Found tasks:', tasks.length);
+    res.json(tasks);
+  } catch (error) {
+    console.error('Error fetching user tasks:', error);
+    res.status(500).json({ message: 'Server error while fetching tasks' });
+  }
+});
+
+const PORT = process.env.PORT || 3000;
 app.listen(3000);
